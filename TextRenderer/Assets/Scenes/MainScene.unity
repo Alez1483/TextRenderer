@@ -322,7 +322,7 @@ MonoBehaviour:
   fontName: Roboto-Medium.ttf
   BezierCount: 500
   gizmoSize: 0
-  text: "abcdjiMm\xD6?"
+  text: "abcdjiMm\xD6?\njotain juu jaa jee"
 --- !u!4 &781389328
 Transform:
   m_ObjectHideFlags: 0

@@ -52,6 +52,12 @@ public class Main : MonoBehaviour
 
         for (int i = 0; i < text.Length; i++)
         {
+            if (text[i] == '\n')
+            {
+                penPoint.x = 0;
+                penPoint.y -= font.LineGap + (font.Ascent - font.Descent);
+                continue;
+            }
             Glyph g = font.glyphs[font.CharacterMapper.CharToGlyphIndex(text[i])];
             DrawGlyph(g, penPoint + new Vector2(g.LeftSideBearing - g.Min.x, 0f));
             penPoint.x += g.AdvanceWidth;

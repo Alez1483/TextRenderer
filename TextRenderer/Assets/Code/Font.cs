@@ -8,10 +8,16 @@ using UnityEngine.Analytics;
 public class Font
 {
     private Dictionary<string, Table> tables;
+
     private int glyphCount;
+
     private uint[] loca; //location table
-    public Glyph[] glyphs;
-    public CharacterMapper characterMapper;
+    public Glyph[] glyphs { get; private set; }
+    public CharacterMapper CharacterMapper { get; private set; }
+
+    public int Ascent { get; private set; }
+    public int Descent { get; private set; }
+    public int LineGap { get; private set; }
 
     public Font(string path)
     {
@@ -39,9 +45,13 @@ public class Font
 
                 ReadLocaTable(reader);
 
-                characterMapper = new CharacterMapper(tables["cmap"].offset, reader);
+
+
+                CharacterMapper = new CharacterMapper(tables["cmap"].offset, reader);
 
                 ReadGlyphTable(reader);
+
+                ReadMetrics(reader);
             }
         }
     }
@@ -82,6 +92,38 @@ public class Font
             {
                 loca[i] = reader.ReadBEUInt();
             }
+        }
+    }
+
+    private void ReadMetrics(BinaryReader reader)
+    {
+        Table horizontalHeader = tables["hhea"];
+        horizontalHeader.MoveStreamToTable(reader.BaseStream, 4); //skip version
+
+        Ascent = reader.ReadBEShort();
+        Descent = reader.ReadBEShort();
+        LineGap = reader.ReadBEShort();
+
+        reader.BaseStream.SkipBytes(12 * 2); //skip advanceWidthMax, minLeftSideBearing ...
+
+        int numOfLongHorMetrics = reader.ReadBEUShort();
+
+        Table horizontalMetrics = tables["hmtx"];
+        horizontalMetrics.MoveStreamToTable(reader.BaseStream);
+
+        int i;
+        for (i = 0; i < numOfLongHorMetrics; i++)
+        {
+            glyphs[i].AdvanceWidth = reader.ReadBEUShort();
+            glyphs[i].LeftSideBearing = reader.ReadBEShort();
+        }
+
+        int lastAdvanceWidth = glyphs[i - 1].AdvanceWidth;
+
+        for (; i < glyphCount; i++)
+        {
+            glyphs[i].AdvanceWidth = lastAdvanceWidth;
+            glyphs[i].LeftSideBearing = reader.ReadBEShort();
         }
     }
 }

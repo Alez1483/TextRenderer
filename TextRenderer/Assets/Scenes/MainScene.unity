@@ -289,7 +289,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e481081435bd58142812bbc01f657bac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  fontName: Roboto-Medium.ttf
   debugGradient:
     serializedVersion: 2
     key0: {r: 1, g: 0, b: 0, a: 1}
@@ -320,12 +319,10 @@ MonoBehaviour:
     m_ColorSpace: -1
     m_NumColorKeys: 6
     m_NumAlphaKeys: 2
+  fontName: Roboto-Medium.ttf
   BezierCount: 500
-  GlyphOffset: 0
-  ShowGlyphsCount: 10
-  PaddingTemporary: 2200
   gizmoSize: 0
-  text: "\"\xD6\xF6kk\xF6s\" testi"
+  text: "abcdjiMm\xD6?"
 --- !u!4 &781389328
 Transform:
   m_ObjectHideFlags: 0

@@ -4,16 +4,12 @@ using UnityEditor;
 
 public class Main : MonoBehaviour
 {
+    public Gradient debugGradient;
     [SerializeField]
     private string fontName;
-    private Font roboto;
-    public Gradient debugGradient;
+    private Font font;
     [Range(0, 500)]
     public int BezierCount = 0;
-    public int GlyphOffset = 0;
-    [Range(0, 100)]
-    public int ShowGlyphsCount = 0;
-    public float PaddingTemporary;
     [Range(0, 0.1f)]
     public float gizmoSize = 0.1f;
 
@@ -22,27 +18,14 @@ public class Main : MonoBehaviour
 
     void Start()
     {
-        roboto = new Font(Path.Combine(Application.dataPath, "Fonts", fontName));
+        font = new Font(Path.Combine(Application.dataPath, "Fonts", fontName));
     }
     private void OnDrawGizmos()
     {
-        if (roboto == null || roboto.glyphs == null)
+        if (font == null || font.glyphs == null)
         {
             return;
         }
-
-        //Vector2 min = glyph.Min;
-        //Vector2 max = glyph.Max;
-        //Gizmos.DrawWireCube((min + max) * 0.5f, max - min);
-
-        //GlyphOffset = Mathf.Clamp(GlyphOffset, 0, roboto.glyphs.Length);
-        //
-        //ShowGlyphsCount = Mathf.Min(ShowGlyphsCount, roboto.glyphs.Length);
-        //
-        //for(int i = 0; i < ShowGlyphsCount; i++)
-        //{
-        //    DrawGlyph(roboto.glyphs[Mathf.Min(i + GlyphOffset, roboto.glyphs.Length - 1)], new Vector2(i * PaddingTemporary, 0f));
-        //}
         DrawString(text);
     }
 
@@ -65,9 +48,13 @@ public class Main : MonoBehaviour
     }
     private void DrawString(string s)
     {
+        Vector2 penPoint = Vector2.zero;
+
         for (int i = 0; i < text.Length; i++)
         {
-            DrawGlyph(roboto.glyphs[roboto.characterMapper.CharToGlyphIndex(text[i])], new Vector2(i * PaddingTemporary, 0f));
+            Glyph g = font.glyphs[font.CharacterMapper.CharToGlyphIndex(text[i])];
+            DrawGlyph(g, penPoint + new Vector2(g.LeftSideBearing - g.Min.x, 0f));
+            penPoint.x += g.AdvanceWidth;
         }
     }
     private void DrawQuadraticBezier(Vector2 start, Vector2 control, Vector2 end, Vector2 offset, Color color)

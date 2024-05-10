@@ -4,7 +4,6 @@ using UnityEngine;
 
 public class Glyph
 {
-    public char Character { get; set; }
     public Vector2[] SplineData { get; private set; }
     public Vector2 Min { get; private set; }
     public Vector2 Max { get; private set; }
@@ -14,10 +13,5 @@ public class Glyph
         SplineData = splineData;
         Min = min;
         Max = max;
-    }
-
-    public override int GetHashCode()
-    {
-        return Character;
     }
 }

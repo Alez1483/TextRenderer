@@ -3,7 +3,7 @@ using System;
 
 public static class FileReadUtilities
 {
-    public static void SkipBytes(this Stream stream, int count)
+    public static void SkipBytes(this Stream stream, long count)
     {
         stream.Seek(count, SeekOrigin.Current);
     }

@@ -321,10 +321,11 @@ MonoBehaviour:
     m_NumColorKeys: 6
     m_NumAlphaKeys: 2
   BezierCount: 500
-  GlyphOffset: 450
+  GlyphOffset: 0
   ShowGlyphsCount: 10
   PaddingTemporary: 2200
-  gizmoSize: 0.01
+  gizmoSize: 0
+  text: "\"\xD6\xF6kk\xF6s\" testi"
 --- !u!4 &781389328
 Transform:
   m_ObjectHideFlags: 0

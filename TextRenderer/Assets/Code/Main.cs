@@ -70,4 +70,9 @@ public class Main : MonoBehaviour
         end += offset;
         Handles.DrawBezier(start, end, Vector2.Lerp(start, control, 2f / 3f), Vector2.Lerp(end, control, 2f / 3f), color, Texture2D.whiteTexture, 1f);
     }
+
+    void OnDisable()
+    {
+        font.Dispose();    
+    }
 }

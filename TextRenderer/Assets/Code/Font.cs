@@ -5,7 +5,7 @@ using System.IO;
 using System;
 using UnityEngine.Analytics;
 
-public class Font
+public class Font : IDisposable
 {
     private Dictionary<string, Table> tables;
 
@@ -14,6 +14,9 @@ public class Font
     private uint[] loca; //location table
     public Glyph[] glyphs { get; private set; }
     public CharacterMapper CharacterMapper { get; private set; }
+
+    public ComputeBuffer GlyphDataBuffer { get; private set; }
+    public ComputeBuffer GlyphLocaBuffer { get; private set; }
 
     public int Ascent { get; private set; }
     public int Descent { get; private set; }
@@ -50,6 +53,8 @@ public class Font
                 CharacterMapper = new CharacterMapper(tables["cmap"].offset, reader);
 
                 ReadGlyphTable(reader);
+
+                InitializeBuffers();
 
                 ReadMetrics(reader);
             }
@@ -125,6 +130,48 @@ public class Font
             glyphs[i].AdvanceWidth = lastAdvanceWidth;
             glyphs[i].LeftSideBearing = reader.ReadBEShort();
         }
+    }
+
+    private void InitializeBuffers()
+    {
+        List<Vector2> normalizedData = new List<Vector2>();
+        uint[] locations = new uint[glyphCount + 1];
+
+        uint location = 0;
+
+        for (int glyphIndex = 0; glyphIndex < glyphCount; glyphIndex++)
+        {
+            locations[glyphIndex] = location;
+
+            Glyph glyph = glyphs[glyphIndex];
+
+            Vector2 min = glyph.Min;
+            Vector2 max = glyph.Max;
+            Vector2 size = max - min;
+
+            var splineData = glyph.SplineData;
+
+            for (int i = 0; i < splineData.Length; i++)
+            {
+                normalizedData.Add((splineData[i] - min) / size); //from 0 to 1 values
+            }
+
+            location += (uint)splineData.Length;
+        }
+
+        locations[glyphCount] = location; //extra location to calculate the length of the glyph data
+
+        GlyphDataBuffer = new ComputeBuffer(normalizedData.Count, sizeof(float) * 2, ComputeBufferType.Structured);
+        GlyphDataBuffer.SetData(normalizedData);
+
+        GlyphLocaBuffer = new ComputeBuffer(locations.Length, sizeof(uint));
+        GlyphLocaBuffer.SetData(locations);
+    }
+
+    public void Dispose()
+    {
+        GlyphDataBuffer.Release();
+        GlyphLocaBuffer.Release();
     }
 }
 

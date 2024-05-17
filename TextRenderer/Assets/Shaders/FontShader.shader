@@ -2,7 +2,8 @@ Shader "Unlit/FontShader"
 {
     Properties
     {
-        
+        //by default half a pixel wide padding around the glyph to avoid aliasing around the edges
+        [HideInInspector]_PaddingPixels("hidden", Float) = 0.5
     }
     SubShader
     {
@@ -19,7 +20,6 @@ Shader "Unlit/FontShader"
 
             struct appdata
             {
-                float2 uv : TEXCOORD0;
                 float4 vertex : POSITION;
             };
 
@@ -27,7 +27,7 @@ Shader "Unlit/FontShader"
             {
                 float2 uv : TEXCOORD0;
                 float4 vertex : SV_POSITION;
-                nointerpolation uint instanceID : TEXCOORD1; //might not work for large instance counts
+                nointerpolation uint instanceID : TEXCOORD1; //might not work for large instance counts though nointerpolation could help
             };
 
             struct Bezier
@@ -47,62 +47,73 @@ Shader "Unlit/FontShader"
             StructuredBuffer<Glyph> _TextBuffer;
             StructuredBuffer<Bezier> _GlyphDataBuffer;
             StructuredBuffer<uint> _GlyphLocaBuffer;
+            float _PaddingPixels;
 
             v2f vert (appdata v, uint svInstanceID : SV_InstanceID)
             {
                 v2f o;
                 o.instanceID = svInstanceID;
                 Glyph glyph = _TextBuffer[svInstanceID];
-                float3 worldPos = float3(v.vertex.xy * glyph.size + glyph.pos, 0.0);
+
+                float padding;
+
+                if (unity_OrthoParams.w > 0.5) //orthogrpahic
+                {
+                    padding = unity_OrthoParams.y / _ScreenParams.y * _PaddingPixels * 2.0; // size / screen height
+                }
+                else //perspective
+                {
+                    //works because math: eye depth / _m11 / screen height. derived from the fact that fov = atan(1.0 / _m11) * 2
+                    padding = max(-mul(UNITY_MATRIX_V, float4(glyph.pos + 0.5 * glyph.size, 0.0, 1.0)).z / unity_CameraProjection._m11 / _ScreenParams.y * _PaddingPixels * 2.0, 0.0);
+                }
+
+                float2 scaledCoord = v.vertex.xy * (glyph.size + 2 * padding) - padding;
+                float3 worldPos = float3(scaledCoord + glyph.pos, 0.0); //add padding around the mesh (note! only works for quad meshes)
+                o.uv = scaledCoord / glyph.size; //object space position is identical to uv coordinate
                 o.vertex = mul(UNITY_MATRIX_VP, float4(worldPos, 1.0));
-                o.uv = v.uv;
                 return o;
             }
 
-            float calculateBezierX(float x1, float x2, float x3, float t)
+            float calculateBezierX(float x1, float x2, float x3, float t) //works for Y as well
             {
-                return lerp(lerp(x1, x2, t), lerp(x2, x3, t), t);
+                return lerp(lerp(x1, x2, t), lerp(x2, x3, t), t); //could be potentially optimized
             }
 
             float evaluateGlyph(float2 uv, float pixelsPerUVX, uint startLoca, uint bezierCount)
             {
-                float fraction = 0.0; //enables horizontal anti-aliasing
+                float fraction = 0.0; //fractional winding number, enables horizontal anti-aliasing almost for free
 
                 for (uint j = 0; j < bezierCount; j++)
                 {
                     Bezier bezier = _GlyphDataBuffer[startLoca + j];
 
-                    float y1 = bezier.start.y - uv.y;
-                    float y2 = bezier.middle.y - uv.y;
-                    float y3 = bezier.end.y - uv.y;
+                    //position in question translated to origin
+                    float2 p1 = bezier.start - uv;
+                    float2 p2 = bezier.middle - uv;
+                    float2 p3 = bezier.end - uv;
 
-                    float a = y1 - 2 * y2 + y3;
-                    float b = y1 - y2;
-                    float c = y1;
+                    //multipliers of quadratic equation
+                    float a = p1.y - 2 * p2.y + p3.y;
+                    float b = p1.y - p2.y; //(should be -2(b) but the formula can be simplified this way)
+                    float c = p1.y;
 
                     #define EPSILON 0.0001
 
                     float discriminant = max(b * b - a * c, 0.0);
 
-                    uint lookupIndex = (y1 < 0.0) + (y2 < 0.0) * 2 + (y3 < 0.0) * 4;
+                    uint lookupIndex = (p1.y < 0.0) + (p2.y < 0.0) * 2 + (p3.y < 0.0) * 4;
 
                     uint firstRootTable = 0x74;
 
                     if ((firstRootTable >> lookupIndex) & 1) //first root is eligible
                     {
-                        float t;
-                        if (abs(a) > EPSILON)
-                        {
-                            t = (b - sqrt(discriminant)) / a; //possible intersection
-                        }
-                        else
-                        {
-                            t = c / (2 * b);
-                        }
+                        //simplified from quadratic formula (variable b above is multiplied by -2 from what it should be)
+                        //set to c / (2 * b) when straight line (otherwise division by zero occurs). works only when p2 is in the middle of p1 and p3
+                        float t = abs(a) > EPSILON? (b - sqrt(discriminant)) / a : c / (2 * b); //possible intersection
                         
                         if (t >= 0.0 && t < 1.0)
                         {
-                            fraction += saturate((calculateBezierX(bezier.start.x, bezier.middle.x, bezier.end.x, t) - uv.x) * pixelsPerUVX + 0.5);
+                            fraction += saturate((calculateBezierX(p1.x, p2.x, p3.x, t)) * pixelsPerUVX + 0.5);
                         }
                     }
 
@@ -110,19 +121,11 @@ Shader "Unlit/FontShader"
 
                     if ((secondRootTable >> lookupIndex) & 1) //second root is eligible
                     {
-                        float t;
-                        if (abs(a) > EPSILON)
-                        {
-                            t = (b + sqrt(discriminant)) / a; //possible intersection
-                        }
-                        else
-                        {
-                            t = c / (2 * b);
-                        }
+                        float t = abs(a) > EPSILON? (b + sqrt(discriminant)) / a : c / (2 * b); //possible intersection
 
                         if (t >= 0.0 && t < 1.0)
                         {
-                            fraction -= saturate((calculateBezierX(bezier.start.x, bezier.middle.x, bezier.end.x, t) - uv.x) * pixelsPerUVX + 0.5);
+                            fraction -= saturate((calculateBezierX(p1.x, p2.x, p3.x, t)) * pixelsPerUVX + 0.5);
                         }
                     }
                 }

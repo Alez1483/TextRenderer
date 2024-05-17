@@ -212,6 +212,7 @@ MonoBehaviour:
     write some text here to figure out whether this is readable
 
 '
+  padding: 0.5
 --- !u!4 &182310188
 Transform:
   m_ObjectHideFlags: 0
@@ -272,7 +273,7 @@ MonoBehaviour:
   fontName: ArialLicenceRemove.ttf
   BezierCount: 463
   gizmoSize: 0.0244
-  text: 
+  text: 'Let''s write some text here '
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -376,9 +377,9 @@ Camera:
     width: 1
     height: 1
   near clip plane: 0.3
-  far clip plane: 1000
+  far clip plane: 40627.9
   field of view: 34
-  orthographic: 1
+  orthographic: 0
   orthographic size: 24000
   m_Depth: -1
   m_CullingMask:
@@ -404,7 +405,7 @@ Transform:
   m_GameObject: {fileID: 519420028}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 28762, y: -21680, z: -10}
+  m_LocalPosition: {x: 28762, y: -21680, z: -34249}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

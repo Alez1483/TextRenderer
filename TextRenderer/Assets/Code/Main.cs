@@ -8,7 +8,6 @@ public class Main : MonoBehaviour
     [SerializeField]
     private string fontName;
     private Font font;
-    [Range(0, 500)]
     public int BezierCount = 0;
     [Range(0, 0.1f)]
     public float gizmoSize = 0.1f;

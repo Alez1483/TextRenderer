@@ -134,15 +134,13 @@ public class Font : IDisposable
 
     private void InitializeBuffers()
     {
-        List<Vector2> normalizedData = new List<Vector2>();
-        uint[] locations = new uint[glyphCount + 1];
+        List<Bezier> bezierData = new List<Bezier>();
+        uint[] locations = new uint[glyphCount + 1]; //extra location at the end to calculate the count of beziers in glyph
 
-        uint location = 0;
+        locations[0] = 0;
 
         for (int glyphIndex = 0; glyphIndex < glyphCount; glyphIndex++)
         {
-            locations[glyphIndex] = location;
-
             Glyph glyph = glyphs[glyphIndex];
 
             Vector2 min = glyph.Min;
@@ -151,18 +149,21 @@ public class Font : IDisposable
 
             var splineData = glyph.SplineData;
 
-            for (int i = 0; i < splineData.Length; i++)
+            for (int i = 0; i < splineData.Length; i+=3)
             {
-                normalizedData.Add((splineData[i] - min) / size); //from 0 to 1 values
+                Bezier bezier;
+                bezier.start = (splineData[i] - min) / size; //from 0 to 1 values
+                bezier.middle = (splineData[i + 1] - min) / size;
+                bezier.end = (splineData[i + 2] - min) / size;
+
+                bezierData.Add(bezier);
             }
 
-            location += (uint)splineData.Length;
+            locations[glyphIndex + 1] = (uint)bezierData.Count;
         }
 
-        locations[glyphCount] = location; //extra location to calculate the length of the glyph data
-
-        GlyphDataBuffer = new ComputeBuffer(normalizedData.Count, sizeof(float) * 2, ComputeBufferType.Structured);
-        GlyphDataBuffer.SetData(normalizedData);
+        GlyphDataBuffer = new ComputeBuffer(bezierData.Count, System.Runtime.InteropServices.Marshal.SizeOf<Bezier>(), ComputeBufferType.Structured);
+        GlyphDataBuffer.SetData(bezierData);
 
         GlyphLocaBuffer = new ComputeBuffer(locations.Length, sizeof(uint));
         GlyphLocaBuffer.SetData(locations);
@@ -220,5 +221,19 @@ internal struct Table
         }
 
         return Convert.ToUInt32(System.Text.Encoding.ASCII.GetBytes(tag));
+    }
+}
+
+internal struct Bezier
+{
+    public Vector2 start;
+    public Vector2 middle;
+    public Vector2 end;
+
+    public Bezier(Vector2 s, Vector2 m, Vector2 e)
+    {
+        start = s;
+        middle = m;
+        end = e;
     }
 }

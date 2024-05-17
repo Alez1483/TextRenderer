@@ -2,11 +2,14 @@ Shader "Unlit/FontShader"
 {
     Properties
     {
-
+        
     }
     SubShader
     {
-        Tags { "RenderType"="Transparent" }
+        Tags { "RenderType"="Transparent" "RenderType"="Transparent"}
+        ZWrite Off
+        Cull Off
+        Blend SrcAlpha OneMinusSrcAlpha
 
         Pass
         {
@@ -16,14 +19,22 @@ Shader "Unlit/FontShader"
 
             struct appdata
             {
-                float4 vertex : POSITION;
                 float2 uv : TEXCOORD0;
+                float4 vertex : POSITION;
             };
 
             struct v2f
             {
                 float2 uv : TEXCOORD0;
                 float4 vertex : SV_POSITION;
+                nointerpolation uint instanceID : TEXCOORD1; //might not work for large instance counts
+            };
+
+            struct Bezier
+            {
+                float2 start;
+                float2 middle;
+                float2 end;
             };
 
             struct Glyph
@@ -34,12 +45,13 @@ Shader "Unlit/FontShader"
             };
 
             StructuredBuffer<Glyph> _TextBuffer;
-            StructuredBuffer<float2> _GlyphDataBuffer;
+            StructuredBuffer<Bezier> _GlyphDataBuffer;
             StructuredBuffer<uint> _GlyphLocaBuffer;
 
             v2f vert (appdata v, uint svInstanceID : SV_InstanceID)
             {
                 v2f o;
+                o.instanceID = svInstanceID;
                 Glyph glyph = _TextBuffer[svInstanceID];
                 float3 worldPos = float3(v.vertex.xy * glyph.size + glyph.pos, 0.0);
                 o.vertex = mul(UNITY_MATRIX_VP, float4(worldPos, 1.0));
@@ -47,65 +59,79 @@ Shader "Unlit/FontShader"
                 return o;
             }
 
-            float dot2(float2 v) { return dot(v, v); }
-
-            float sdBezier(float2 pos, float2 A, float2 B, float2 C)
+            float calculateBezierX(float x1, float x2, float x3, float t)
             {
-                float2 a = B - A;
-                float2 b = A - 2.0 * B + C;
-                float2 c = a * 2.0;
-                float2 d = A - pos;
-                float kk = 1.0 / dot(b, b);
-                float kx = kk * dot(a, b);
-                float ky = kk * (2.0 * dot(a, a) + dot(d, b)) / 3.0;
-                float kz = kk * dot(d, a);
-                float res = 0.0;
-                float p = ky - kx * kx;
-                float p3 = p * p * p;
-                float q = kx * (2.0 * kx * kx - 3.0 * ky) + kz;
-                float h = q * q + 4.0 * p3;
-                if (h >= 0.0)
-                {
-                    h = sqrt(h);
-                    float2 x = (float2(h, -h) - q) / 2.0;
-                    float2 uv = sign(x) * pow(abs(x), float2(1.0 / 3.0, 1.0 / 3.0));
-                    float t = clamp(uv.x + uv.y - kx, 0.0, 1.0);
-                    res = dot2(d + (c + b * t) * t);
-                }
-                else
-                {
-                    float z = sqrt(-p);
-                    float v = acos(q / (p * z * 2.0)) / 3.0;
-                    float m = cos(v);
-                    float n = sin(v) * 1.732050808;
-                    float3  t = clamp(float3(m + m, -n - m, n - m) * z - kx, 0.0, 1.0);
-                    res = min(dot2(d + (c + b * t.x) * t.x),
-                        dot2(d + (c + b * t.y) * t.y));
-                    // the third root cannot be the closest
-                    // res = min(res,dot2(d+(c+b*t.z)*t.z));
-                }
-                return sqrt(res);
+                return lerp(lerp(x1, x2, t), lerp(x2, x3, t), t);
             }
 
-            float4 frag (v2f i, uint svInstanceID : SV_InstanceID) : SV_Target
+            float4 frag (v2f i) : SV_Target
             {
-                Glyph glyph = _TextBuffer[svInstanceID];
+                Glyph glyph = _TextBuffer[i.instanceID];
                 uint startLoca = _GlyphLocaBuffer[glyph.index];
-                uint curvePointCount = (_GlyphLocaBuffer[glyph.index + 1] - startLoca);
+                uint bezierCount = (_GlyphLocaBuffer[glyph.index + 1] - startLoca);
 
-                float smallestDist = 1000;
+                int windingNumber = 0;
 
-                for (int j = 0; j < curvePointCount; j++)
+                for (uint j = 0; j < bezierCount; j++)
                 {
-                    float dist = distance(i.uv, _GlyphDataBuffer[startLoca + j]);
-                    //float dist = sdBezier(i.uv, _GlyphDataBuffer[startLoca + j], _GlyphDataBuffer[startLoca + j + 1], _GlyphDataBuffer[startLoca + j + 2]);
-                    if (dist < smallestDist)
+                    Bezier bezier = _GlyphDataBuffer[startLoca + j];
+
+                    float y1 = bezier.start.y - i.uv.y;
+                    float y2 = bezier.middle.y - i.uv.y;
+                    float y3 = bezier.end.y - i.uv.y;
+
+                    float a = y1 - 2 * y2 + y3;
+                    float b = y1 - y2;
+                    float c = y1;
+
+                    float fraction = 0.0; //horizontal anti-aliasing
+
+                    float discriminant = max(b * b - a * c, 0.0);
+
+                    uint lookupIndex = (y1 < 0.0) + (y2 < 0.0) * 2 + (y3 < 0.0) * 4;
+
+                    uint firstRootTable = 0x74;
+
+                    if ((firstRootTable >> lookupIndex) & 1) //first root is eligible
                     {
-                        smallestDist = dist;
+                        float t;
+                        if (abs(a) > 0.0001)
+                        {
+                            t = (b - sqrt(discriminant)) / a; //possible intersection
+                        }
+                        else
+                        {
+                            t =  c / (2 * b);
+                        }
+                        
+                        if (t >= 0.0 && t < 1.0 && calculateBezierX(bezier.start.x, bezier.middle.x, bezier.end.x, t) >= i.uv.x)
+                        {
+                            windingNumber++;
+                        }
+                    }
+
+                    uint secondRootTable = 0x2E;
+
+                    if ((secondRootTable >> lookupIndex) & 1) //second root is eligible
+                    {
+                        float t;
+                        if (abs(a) > 0.0001)
+                        {
+                            t = (b + sqrt(discriminant)) / a; //possible intersection
+                        }
+                        else
+                        {
+                            t =  c / (2 * b);
+                        }
+
+                        if (t >= 0.0 && t < 1.0 && calculateBezierX(bezier.start.x, bezier.middle.x, bezier.end.x, t) >= i.uv.x)
+                        {
+                           windingNumber--;
+                        }
                     }
                 }
-                //return float4(i.uv.xy, 0.0, 1.0);
-                return float4(smallestDist.xxx, 1);
+
+                return float4(1, 1, 1, windingNumber != 0);
             }
             ENDCG
         }

@@ -10,7 +10,6 @@ public class TextRenderer : MonoBehaviour
     private string fontPath;
     private Font font;
 
-
     [TextArea]
     public string text;
     private string previousText = "";
@@ -33,6 +32,7 @@ public class TextRenderer : MonoBehaviour
         glyphMaterial.SetBuffer(Shader.PropertyToID("_GlyphLocaBuffer"), font.GlyphLocaBuffer);
 
         renderParams = new RenderParams(glyphMaterial);
+        renderParams.worldBounds = new Bounds(Vector3.zero, Vector3.one * 1e10f); //put something more reasonable later maybe?
         renderParams.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         renderParams.receiveShadows = false;
         renderParams.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
@@ -112,6 +112,7 @@ public class TextRenderer : MonoBehaviour
     void OnDisable()
     {
         textBuffer?.Release();
+        commandBuffer.Release();
         font.Dispose();
         Destroy(quadMesh);
         Destroy(glyphMaterial);

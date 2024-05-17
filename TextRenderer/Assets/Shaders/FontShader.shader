@@ -64,27 +64,23 @@ Shader "Unlit/FontShader"
                 return lerp(lerp(x1, x2, t), lerp(x2, x3, t), t);
             }
 
-            float4 frag (v2f i) : SV_Target
+            float evaluateGlyph(float2 uv, float pixelsPerUVX, uint startLoca, uint bezierCount)
             {
-                Glyph glyph = _TextBuffer[i.instanceID];
-                uint startLoca = _GlyphLocaBuffer[glyph.index];
-                uint bezierCount = (_GlyphLocaBuffer[glyph.index + 1] - startLoca);
-
-                int windingNumber = 0;
+                float fraction = 0.0; //enables horizontal anti-aliasing
 
                 for (uint j = 0; j < bezierCount; j++)
                 {
                     Bezier bezier = _GlyphDataBuffer[startLoca + j];
 
-                    float y1 = bezier.start.y - i.uv.y;
-                    float y2 = bezier.middle.y - i.uv.y;
-                    float y3 = bezier.end.y - i.uv.y;
+                    float y1 = bezier.start.y - uv.y;
+                    float y2 = bezier.middle.y - uv.y;
+                    float y3 = bezier.end.y - uv.y;
 
                     float a = y1 - 2 * y2 + y3;
                     float b = y1 - y2;
                     float c = y1;
 
-                    float fraction = 0.0; //horizontal anti-aliasing
+                    #define EPSILON 0.0001
 
                     float discriminant = max(b * b - a * c, 0.0);
 
@@ -95,18 +91,18 @@ Shader "Unlit/FontShader"
                     if ((firstRootTable >> lookupIndex) & 1) //first root is eligible
                     {
                         float t;
-                        if (abs(a) > 0.0001)
+                        if (abs(a) > EPSILON)
                         {
                             t = (b - sqrt(discriminant)) / a; //possible intersection
                         }
                         else
                         {
-                            t =  c / (2 * b);
+                            t = c / (2 * b);
                         }
                         
-                        if (t >= 0.0 && t < 1.0 && calculateBezierX(bezier.start.x, bezier.middle.x, bezier.end.x, t) >= i.uv.x)
+                        if (t >= 0.0 && t < 1.0)
                         {
-                            windingNumber++;
+                            fraction += saturate((calculateBezierX(bezier.start.x, bezier.middle.x, bezier.end.x, t) - uv.x) * pixelsPerUVX + 0.5);
                         }
                     }
 
@@ -115,23 +111,51 @@ Shader "Unlit/FontShader"
                     if ((secondRootTable >> lookupIndex) & 1) //second root is eligible
                     {
                         float t;
-                        if (abs(a) > 0.0001)
+                        if (abs(a) > EPSILON)
                         {
                             t = (b + sqrt(discriminant)) / a; //possible intersection
                         }
                         else
                         {
-                            t =  c / (2 * b);
+                            t = c / (2 * b);
                         }
 
-                        if (t >= 0.0 && t < 1.0 && calculateBezierX(bezier.start.x, bezier.middle.x, bezier.end.x, t) >= i.uv.x)
+                        if (t >= 0.0 && t < 1.0)
                         {
-                           windingNumber--;
+                            fraction -= saturate((calculateBezierX(bezier.start.x, bezier.middle.x, bezier.end.x, t) - uv.x) * pixelsPerUVX + 0.5);
                         }
                     }
                 }
 
-                return float4(1, 1, 1, windingNumber != 0);
+                return saturate(fraction); //saturated to prevent leaking artefacts
+            }
+
+            float4 frag (v2f i) : SV_Target
+            {
+                //amount of change in uv coordinates per one pixel
+                float2 uvChangePerPixel = fwidth(i.uv); //sqrt(ddx()^2+ddy()^2) would be accurate but this works well enough
+                float2 pixelsPerUV = 1.0 / uvChangePerPixel; //amount of pixels that can fit in the uv range (0 to 1)
+
+                uint glyphIndex = _TextBuffer[i.instanceID].index;
+
+                uint startLoca = _GlyphLocaBuffer[glyphIndex];
+                uint bezierCount = (_GlyphLocaBuffer[glyphIndex + 1] - startLoca);
+
+                float sum = 0.0;
+
+                #define VERTICAL_SAMPLES 3
+
+                //e.g. VERTICAL_SAMPLES == 3 -> offset = -1/3, 0/3, 1/3    VERTICAL_SAMPLES == 4 -> offset = -1.5/4, -0.5/4, 0.5/4, 1.5/4
+                float offsetDelta = (1.0 / VERTICAL_SAMPLES) * uvChangePerPixel.y;
+                float offset = ((VERTICAL_SAMPLES - 1) / -2.0) * offsetDelta;
+
+                for (int j = 0; j < VERTICAL_SAMPLES; j++)
+                {
+                    sum += evaluateGlyph(i.uv + float2(0.0, offset), pixelsPerUV.x, startLoca, bezierCount);
+                    offset += offsetDelta;
+                }
+
+                return float4(1, 1, 1, sum / VERTICAL_SAMPLES);
             }
             ENDCG
         }

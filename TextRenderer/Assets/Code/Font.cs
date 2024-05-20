@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
 using System;
-using UnityEngine.Analytics;
 
 public class Font : IDisposable
 {

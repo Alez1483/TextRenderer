@@ -1,14 +1,14 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
+[System.Serializable]
+[PreferBinarySerialization]
 public class Glyph
 {
-    public Vector2[] SplineData { get; private set; }
-    public Vector2 Min { get; private set; }
-    public Vector2 Max { get; private set; }
-    public int AdvanceWidth { get; set; }
-    public int LeftSideBearing { get; set; }
+    [field: SerializeField] public Vector2[] SplineData { get; private set; }
+    [field: SerializeField] public Vector2 Min { get; private set; }
+    [field: SerializeField] public Vector2 Max { get; private set; }
+    [field: SerializeField] public int AdvanceWidth { get; set; }
+    [field: SerializeField] public int LeftSideBearing { get; set; }
 
     public Glyph(Vector2[] splineData, Vector2 min, Vector2 max)
     {

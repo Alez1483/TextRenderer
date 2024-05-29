@@ -7,7 +7,6 @@ using UnityEngine;
 public class TextRenderer : MonoBehaviour
 {
     [SerializeField]
-    private string fontPath;
     private Font font;
 
     [TextArea]
@@ -24,12 +23,9 @@ public class TextRenderer : MonoBehaviour
     private GraphicsBuffer commandBuffer;
     private GraphicsBuffer.IndirectDrawIndexedArgs[] indirectDrawArgs;
 
-    void Start()
+    void Awake()
     {
-        glyphMaterial = new Material(ReferenceManager.Instance.FontShader);
-        font = new Font(Path.Combine(Application.dataPath, "Fonts", fontPath));
-        glyphMaterial.SetBuffer(Shader.PropertyToID("_GlyphDataBuffer"), font.GlyphDataBuffer);
-        glyphMaterial.SetBuffer(Shader.PropertyToID("_GlyphLocaBuffer"), font.GlyphLocaBuffer);
+        glyphMaterial = new Material(Shader.Find("Unlit/FontShader"));
 
         renderParams = new RenderParams(glyphMaterial);
         renderParams.worldBounds = new Bounds(Vector3.zero, Vector3.one * 1e10f); //put something more reasonable later maybe?
@@ -108,12 +104,22 @@ public class TextRenderer : MonoBehaviour
         }
     }
 
+    void OnEnable()
+    {
+        font.ActiveRenderers++; //initializes the buffers if not done yet
 
+        glyphMaterial.SetBuffer(Shader.PropertyToID("_GlyphDataBuffer"), font.GlyphDataBuffer); //to make sure the buffers are not changed
+        glyphMaterial.SetBuffer(Shader.PropertyToID("_GlyphLocaBuffer"), font.GlyphLocaBuffer);
+    }
     void OnDisable()
+    {
+        font.ActiveRenderers--; //releases the buffers if not needed anymore
+    }
+
+    void OnDestroy()
     {
         textBuffer?.Release();
         commandBuffer.Release();
-        font.Dispose();
         Destroy(quadMesh);
         Destroy(glyphMaterial);
     }

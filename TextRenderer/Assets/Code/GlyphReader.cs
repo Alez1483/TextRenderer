@@ -5,15 +5,15 @@ using System.ComponentModel;
 using System.IO;
 using UnityEngine;
 
-public class GlyphReader
+public static class GlyphReader
 {
-    private uint[] loca; //location table
-    private Glyph[] glyphArray; //needed for compound glyphs
+    private static uint[] loca; //location table
+    private static Glyph[] glyphArray; //needed for compound glyphs
     
-    public GlyphReader(uint glyphTableOffset, BinaryReader reader, uint[] loca, Glyph[] glyphsOut)
+    public static void ReadGlyphs(uint glyphTableOffset, BinaryReader reader, uint[] loca, Glyph[] glyphsOut)
     {
-        this.loca = loca;
-        this.glyphArray = glyphsOut;
+        GlyphReader.loca = loca;
+        glyphArray = glyphsOut;
 
         for (int i = 0;  i < glyphsOut.Length; i++)
         {
@@ -21,8 +21,8 @@ public class GlyphReader
         }
     }
 
-    //reads one glyp from the 'glyf' table and stores it in glyphArray as well as returns it
-    private Glyph ReadGlyph(uint glyphTableOffset, int glyphIndex, BinaryReader reader)
+    //reads one glyp from the 'glyf' table and stores it in glyphArray as well as returns it (easier for compounds)
+    private static Glyph ReadGlyph(uint glyphTableOffset, int glyphIndex, BinaryReader reader)
     {
         if (glyphArray[glyphIndex] != null) //compound glyphs can load the component glyphs in advance
         {
@@ -122,15 +122,11 @@ public class GlyphReader
                     {
                         e = reader.ReadBEShort();
                         f = reader.ReadBEShort();
-                        //1st short contains the value of e
-                        //2nd short contains the value of f
                     }
                     else
                     {
                         e = reader.ReadSByte();
                         f = reader.ReadSByte();
-                        //1st byte contains the value of e
-                        //2nd byte contains the value of f
                     }
                 }
                 else
@@ -209,7 +205,7 @@ public class GlyphReader
     //the sentence above implies that the end of a segment is start of the next one meaning there's dublicated data
     //coords = the read coordinates. onCurve = which of the coords points are on and off curve points
     //contourEndPoints = last indexes of each contour (loop of bezier curves)
-    private void GenerateSplineData(Vector2[] coords, int[] contourEndPoints, bool[] onCurve, List<Vector2> pointsOut)
+    private static void GenerateSplineData(Vector2[] coords, int[] contourEndPoints, bool[] onCurve, List<Vector2> pointsOut)
     {
         int contourStartIndex = 0;
         //originalIndex = index going through flags/xCoords/yCoords/onCurve array
@@ -281,7 +277,7 @@ public class GlyphReader
     //adds point (or two) at the end of pnts array between firstIdx and secondIdx of the coordinate arrays
     //xCs and yCs are the x and y coordinates of the points
     //doubledPoints will add the same point twice
-    private void AddPointBetween(int firstIdx, int secondIdx, Vector2[] coords, List<Vector2> pnts, bool doubledPoint = false)
+    private static void AddPointBetween(int firstIdx, int secondIdx, Vector2[] coords, List<Vector2> pnts, bool doubledPoint = false)
     {
         Vector2 point = (coords[firstIdx] + coords[secondIdx]) * 0.5f;
         pnts.Add(point);
@@ -295,7 +291,7 @@ public class GlyphReader
     //flags are used to figure out the format
     //resulting array stored in coordOut
     //isX used to figure where on the flag masks to look for
-    private void ReadCoordArray(BinaryReader reader, byte[] flags, bool isX, int[] coordOut)
+    private static void ReadCoordArray(BinaryReader reader, byte[] flags, bool isX, int[] coordOut)
     {
         int lastPosition = 0;
 
@@ -325,7 +321,7 @@ public class GlyphReader
         }
     }
     //affine transformation for the point
-    private Vector2 transformGlyphPoint(Vector2 point, float a, float b, float c, float d, float e, float f, float m, float n)
+    private static Vector2 transformGlyphPoint(Vector2 point, float a, float b, float c, float d, float e, float f, float m, float n)
     {
         Vector2 o;
         o.x = m * (a / m * point.x + c / m * point.y + e);

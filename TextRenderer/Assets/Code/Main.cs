@@ -6,8 +6,7 @@ public class Main : MonoBehaviour
 {
     public Gradient debugGradient;
     [SerializeField]
-    private string fontName;
-    private Font font;
+    public Font font;
     public int BezierCount = 0;
     [Range(0, 0.1f)]
     public float gizmoSize = 0.1f;
@@ -15,10 +14,6 @@ public class Main : MonoBehaviour
     [TextArea]
     public string text;
 
-    void Start()
-    {
-        font = new Font(Path.Combine(Application.dataPath, "Fonts", fontName));
-    }
     private void OnDrawGizmos()
     {
         if (font == null || font.glyphs == null)
@@ -68,10 +63,5 @@ public class Main : MonoBehaviour
         control += offset;
         end += offset;
         Handles.DrawBezier(start, end, Vector2.Lerp(start, control, 2f / 3f), Vector2.Lerp(end, control, 2f / 3f), color, Texture2D.whiteTexture, 1f);
-    }
-
-    void OnDisable()
-    {
-        font.Dispose();    
     }
 }

@@ -4,9 +4,17 @@ using UnityEngine;
 using System.IO;
 using System;
 
-public class CharacterMapper
+[Serializable]
+public class CharacterMapper : ISerializationCallbackReceiver
 {
-    private Dictionary<uint, int> charToGlyphInxexMap = new Dictionary<uint, int>();
+    [SerializeField]
+    private Dictionary<uint, int> charToGlyphIndexMap = new();
+
+    //only needed for serialization
+    [SerializeField, HideInInspector]
+    private List<uint> keys = new List<uint>();
+    [SerializeField, HideInInspector]
+    private List<int> values = new();
 
     public CharacterMapper(uint cmapTableOffset, BinaryReader reader)
     {
@@ -102,7 +110,7 @@ public class CharacterMapper
                     glyphIndex = (glyphIndex + delta) % 65536;
                 }
 
-                charToGlyphInxexMap.Add((uint)unicode, glyphIndex);
+                charToGlyphIndexMap.Add((uint)unicode, glyphIndex);
             }
         }
     }
@@ -121,7 +129,7 @@ public class CharacterMapper
 
             for (uint unicode = startCharCode, glyphCode = startGlyphCode; unicode <= endCharCode; unicode++, glyphCode++)
             {
-                charToGlyphInxexMap.Add(unicode, (int)glyphCode);
+                charToGlyphIndexMap.Add(unicode, (int)glyphCode);
             }
         }
     }
@@ -140,7 +148,7 @@ public class CharacterMapper
 
             for (uint unicode = startCharCode; unicode <= endCharCode; unicode++)
             {
-                charToGlyphInxexMap.Add(unicode, (int)glyphId);
+                charToGlyphIndexMap.Add(unicode, (int)glyphId);
             }
         }
     }
@@ -149,11 +157,37 @@ public class CharacterMapper
     {
         try
         {
-            return charToGlyphInxexMap[c];
+            return charToGlyphIndexMap[c];
         }
         catch (KeyNotFoundException)
         {
             return 0; //missing character glyph
+        }
+    }
+
+    public void OnBeforeSerialize()
+    {
+        if (charToGlyphIndexMap == null)
+        {
+            return;
+        }
+
+        keys.Clear();
+        values.Clear();
+
+        foreach (var keyValuePair in charToGlyphIndexMap)
+        {
+            keys.Add(keyValuePair.Key);
+            values.Add(keyValuePair.Value);
+        }
+    }
+    public void OnAfterDeserialize()
+    {
+        charToGlyphIndexMap = new Dictionary<uint, int>(keys.Count);
+
+        for (int i = 0; i < keys.Count; i++)
+        {
+            charToGlyphIndexMap.Add(keys[i], values[i]);
         }
     }
 }

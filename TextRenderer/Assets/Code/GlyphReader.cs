@@ -8,32 +8,36 @@ using UnityEngine;
 public static class GlyphReader
 {
     private static uint[] loca; //location table
-    private static Glyph[] glyphArray; //needed for compound glyphs
+    private static GlyphMetrics[] glyphMetricsArray; //needed for compound glyphs
     
-    public static void ReadGlyphs(uint glyphTableOffset, BinaryReader reader, uint[] loca, Glyph[] glyphsOut)
+    public static List<Vector2>[] ReadGlyphs(uint glyphTableOffset, BinaryReader reader, uint[] loca, GlyphMetrics[] glyphMetricsOut)
     {
         GlyphReader.loca = loca;
-        glyphArray = glyphsOut;
+        glyphMetricsArray = glyphMetricsOut;
+        List<Vector2>[] glyphData = new List<Vector2>[glyphMetricsOut.Length];
 
-        for (int i = 0;  i < glyphsOut.Length; i++)
+        for (int i = 0;  i < glyphMetricsOut.Length; i++)
         {
-            ReadGlyph(glyphTableOffset, i, reader);
+            ReadGlyph(glyphTableOffset, i, reader, glyphData);
         }
+
+        return glyphData;
     }
 
-    //reads one glyp from the 'glyf' table and stores it in glyphArray as well as returns it (easier for compounds)
-    private static Glyph ReadGlyph(uint glyphTableOffset, int glyphIndex, BinaryReader reader)
+    //reads one glyp from the 'glyf' table and stores it in glyphArray and glyphDataOut as well as returns it (easier for compounds)
+    private static void ReadGlyph(uint glyphTableOffset, int glyphIndex, BinaryReader reader, List<Vector2>[] glyphDataOut)
     {
-        if (glyphArray[glyphIndex] != null) //compound glyphs can load the component glyphs in advance
+        if (glyphMetricsArray[glyphIndex] != null) //compound glyphs can load the component glyphs in advance
         {
-            return glyphArray[glyphIndex];
+            return;
         }
 
         if (loca[glyphIndex + 1] - loca[glyphIndex] == 0) //empty glyph
         {
-            Glyph glyph = new Glyph(Array.Empty<Vector2>(), Vector2.zero, Vector2.zero);
-            glyphArray[glyphIndex] = glyph;
-            return glyph;
+            GlyphMetrics metrics = new GlyphMetrics(Vector2.zero, Vector2.zero);
+            glyphMetricsArray[glyphIndex] = metrics;
+            //leave glyphDataOut null
+            return;
         }
 
         reader.BaseStream.Position = glyphTableOffset + loca[glyphIndex]; //needed for compound glyphs
@@ -47,8 +51,6 @@ public static class GlyphReader
 
         Vector2 min = new Vector2(xMin, yMin);
         Vector2 max = new Vector2(xMax, yMax);
-
-        List<Vector2> points;
 
         if (numberOfContours > 0) //simple glyph
         {
@@ -96,15 +98,17 @@ public static class GlyphReader
                 onCurve[i] = FileReadUtilities.IsBitActive(flags[i], 0);
             }
 
-            points = new List<Vector2>(xCoords.Length);
+            glyphDataOut[glyphIndex] = new List<Vector2>(xCoords.Length);
             if (xCoords.Length > 2) //apparently control characters such as unicode 2000 can have only 1 point in it
             {
-                GenerateSplineData(coords, contourEndPoints, onCurve, points);
+                GenerateSplineData(coords, contourEndPoints, onCurve, glyphDataOut[glyphIndex]);
             }
         }
         else if (numberOfContours < 0) // compound
         {
-            points = new List<Vector2>();
+            glyphDataOut[glyphIndex] = new List<Vector2>();
+            List<Vector2> points = glyphDataOut[glyphIndex];
+
             ushort flag;
             do
             {
@@ -181,11 +185,13 @@ public static class GlyphReader
                 }
 
                 long position = reader.BaseStream.Position;
-                Glyph childGlyph = ReadGlyph(glyphTableOffset, childIndex, reader);
-                reader.BaseStream.Position = position;
+
+                ReadGlyph(glyphTableOffset, childIndex, reader, glyphDataOut); //read the child glyph
+
+                reader.BaseStream.Position = position; //back to where the file was left
                 
-                Vector2[] childData = childGlyph.SplineData;
-                for(int i = 0; i < childData.Length; i++)
+                List<Vector2> childData = glyphDataOut[childIndex];
+                for(int i = 0; i < childData.Count; i++)
                 {
                     points.Add(transformGlyphPoint(childData[i], a, b, c ,d, e, f, m , n));
                 }
@@ -194,12 +200,11 @@ public static class GlyphReader
         }
         else //0 contours
         {
-            points = new List<Vector2>();
+            //leave glyphDataOut null
         }
 
-        Glyph outGlyph = new Glyph(points.ToArray(), min, max);
-        glyphArray[glyphIndex] = outGlyph;
-        return outGlyph;
+        GlyphMetrics outGlyph = new GlyphMetrics(min, max);
+        glyphMetricsArray[glyphIndex] = outGlyph;
     }
     //generates the spline data so that every 3 elements in the pointsOut array makes one bezier segment (start, control, end)
     //the sentence above implies that the end of a segment is start of the next one meaning there's dublicated data
@@ -275,16 +280,16 @@ public static class GlyphReader
         }
     }
     //adds point (or two) at the end of pnts array between firstIdx and secondIdx of the coordinate arrays
-    //xCs and yCs are the x and y coordinates of the points
+    //indices of the points are given
     //doubledPoints will add the same point twice
-    private static void AddPointBetween(int firstIdx, int secondIdx, Vector2[] coords, List<Vector2> pnts, bool doubledPoint = false)
+    private static void AddPointBetween(int firstIdx, int secondIdx, Vector2[] coords, List<Vector2> pntsOut, bool doubledPoint = false)
     {
         Vector2 point = (coords[firstIdx] + coords[secondIdx]) * 0.5f;
-        pnts.Add(point);
+        pntsOut.Add(point);
 
         if (doubledPoint)
         {
-            pnts.Add(point);
+            pntsOut.Add(point);
         }
     }
     //reads one coordinate axis array from file

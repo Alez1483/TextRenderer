@@ -60,8 +60,51 @@ public static class FontReader
     private static void ReadGlyphTable(BinaryReader reader)
     {
         Table glyphTable = tables["glyf"];
-        font.glyphs = new Glyph[glyphCount];
-        GlyphReader.ReadGlyphs(glyphTable.offset, reader, loca, font.glyphs); //reads directly to the glyphs array
+        font.glyphs = new GlyphMetrics[glyphCount];
+        List<Vector2>[] glyphData = GlyphReader.ReadGlyphs(glyphTable.offset, reader, loca, font.glyphs); //reads directly to the glyphs array
+
+        //fill in the glyphBezierData and glyphLocaData arrays to be used for buffers
+
+        int bezierCount = 0; //total count of bezier parts
+        for(int i = 0; i < glyphCount; i++)
+        {
+            var points = glyphData[i];
+            bezierCount += points != null ? points.Count : 0;
+        }
+        bezierCount /= 3;
+
+        font.glyphBezierData = new Bezier[bezierCount];
+        font.glyphLocaData = new uint[font.glyphs.Length + 1]; //extra location at the end to calculate the count of beziers in glyph
+
+        //first location not set because it's 0 by default anyway
+        uint bezierIdx = 0;
+        for (int glyphIndex = 0; glyphIndex < font.glyphs.Length; glyphIndex++)
+        {
+            GlyphMetrics glyphMetrics = font.glyphs[glyphIndex];
+
+            Vector2 min = glyphMetrics.Min;
+            Vector2 size = glyphMetrics.Max - min;
+
+            font.glyphLocaData[glyphIndex] = bezierIdx;
+
+            var splineData = glyphData[glyphIndex];
+
+            if (splineData == null)
+            {
+                continue;
+            }
+
+            for (int i = 0; i < splineData.Count; i += 3, bezierIdx++)
+            {
+                Bezier bezier;
+                bezier.start = (splineData[i] - min) / size; //from 0 to 1 values
+                bezier.middle = (splineData[i + 1] - min) / size;
+                bezier.end = (splineData[i + 2] - min) / size;
+
+                font.glyphBezierData[bezierIdx] = bezier;
+            }
+        }
+        font.glyphLocaData[font.glyphLocaData.Length - 1] = bezierIdx;
     }
 
     //reads the location table
@@ -126,6 +169,8 @@ public static class FontReader
             font.glyphs[i].LeftSideBearing = reader.ReadBEShort();
         }
     }
+
+
 }
 internal struct Table
 {

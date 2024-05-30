@@ -35,10 +35,13 @@ public class Font : ScriptableObject
 
     public UnityEngine.Object FontAsset;
 
-    public Glyph[] glyphs;
+    public GlyphMetrics[] glyphs;
     public CharacterMapper CharacterMapper;
 
+    public Bezier[] glyphBezierData;
     public ComputeBuffer GlyphDataBuffer { get; private set; }
+
+    public uint[] glyphLocaData;
     public ComputeBuffer GlyphLocaBuffer { get; private set; }
 
     public int Ascent;
@@ -50,38 +53,10 @@ public class Font : ScriptableObject
         GlyphDataBuffer?.Release(); //get rid of old buffers
         GlyphLocaBuffer?.Release();
 
-        List<Bezier> bezierData = new List<Bezier>();
-        uint[] locations = new uint[glyphs.Length + 1]; //extra location at the end to calculate the count of beziers in glyph
+        GlyphDataBuffer = new ComputeBuffer(glyphBezierData.Length, System.Runtime.InteropServices.Marshal.SizeOf<Bezier>(), ComputeBufferType.Structured);
+        GlyphDataBuffer.SetData(glyphBezierData);
 
-        //first location not set because it's 0 by default anyway
-
-        for (int glyphIndex = 0; glyphIndex < glyphs.Length; glyphIndex++)
-        {
-            Glyph glyph = glyphs[glyphIndex];
-
-            Vector2 min = glyph.Min;
-            Vector2 max = glyph.Max;
-            Vector2 size = max - min;
-
-            var splineData = glyph.SplineData;
-
-            for (int i = 0; i < splineData.Length; i+=3)
-            {
-                Bezier bezier;
-                bezier.start = (splineData[i] - min) / size; //from 0 to 1 values
-                bezier.middle = (splineData[i + 1] - min) / size;
-                bezier.end = (splineData[i + 2] - min) / size;
-
-                bezierData.Add(bezier);
-            }
-
-            locations[glyphIndex + 1] = (uint)bezierData.Count;
-        }
-
-        GlyphDataBuffer = new ComputeBuffer(bezierData.Count, System.Runtime.InteropServices.Marshal.SizeOf<Bezier>(), ComputeBufferType.Structured);
-        GlyphDataBuffer.SetData(bezierData);
-
-        GlyphLocaBuffer = new ComputeBuffer(locations.Length, sizeof(uint));
-        GlyphLocaBuffer.SetData(locations);
+        GlyphLocaBuffer = new ComputeBuffer(glyphLocaData.Length, sizeof(uint));
+        GlyphLocaBuffer.SetData(glyphLocaData);
     }
 }

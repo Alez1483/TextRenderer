@@ -78,13 +78,13 @@ public class TextRenderer : MonoBehaviour
                     continue;
                 }
                 int glyphIndex = font.CharacterMapper.CharToGlyphIndex(text[i]);
-                Glyph g = font.glyphs[glyphIndex];
+                GlyphMetrics g = font.glyphs[glyphIndex];
 
                 Vector2 position = penPoint + new Vector2(g.LeftSideBearing, g.Min.y);
                 Vector2 size = g.Max - g.Min;
                 penPoint.x += g.AdvanceWidth;
 
-                if (g.SplineData.Length < 3)
+                if (font.glyphLocaData[glyphIndex + 1] - font.glyphLocaData[glyphIndex] < 1)
                 {
                     continue;
                 }

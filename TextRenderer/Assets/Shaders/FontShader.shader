@@ -44,10 +44,16 @@ Shader "Unlit/FontShader"
                 float2 size;
             };
 
-            StructuredBuffer<Glyph> _TextBuffer;
-            StructuredBuffer<Bezier> _GlyphDataBuffer;
-            StructuredBuffer<uint> _GlyphLocaBuffer;
-            float _PaddingPixels;
+            uniform StructuredBuffer<Glyph> _TextBuffer;
+            uniform StructuredBuffer<Bezier> _GlyphDataBuffer;
+            uniform StructuredBuffer<uint> _GlyphLocaBuffer;
+
+            uniform float _PaddingPixels;
+
+            uniform float _Scale;
+            uniform float4x4 _ObjectToWorld;
+
+            uniform float4 _Color;
 
             v2f vert (appdata v, uint svInstanceID : SV_InstanceID)
             {
@@ -56,7 +62,7 @@ Shader "Unlit/FontShader"
                 Glyph glyph = _TextBuffer[svInstanceID];
 
                 float padding;
-
+                
                 if (unity_OrthoParams.w > 0.5) //orthogrpahic
                 {
                     padding = unity_OrthoParams.y / _ScreenParams.y * _PaddingPixels * 2.0; // size / screen height
@@ -64,13 +70,16 @@ Shader "Unlit/FontShader"
                 else //perspective
                 {
                     //works because math: eye depth / _m11 / screen height. derived from the fact that fov = atan(1.0 / _m11) * 2
-                    padding = max(-mul(UNITY_MATRIX_V, float4(glyph.pos + 0.5 * glyph.size, 0.0, 1.0)).z / unity_CameraProjection._m11 / _ScreenParams.y * _PaddingPixels * 2.0, 0.0);
+                    padding = max(-mul(UNITY_MATRIX_V, mul(_ObjectToWorld, float4((glyph.pos + 0.5 * glyph.size) * _Scale, 0.0, 1.0))).z / unity_CameraProjection._m11 / _ScreenParams.y * _PaddingPixels * 2.0, 0.0);
                 }
-
+                padding /= _Scale;
+                
                 float2 scaledCoord = v.vertex.xy * (glyph.size + 2 * padding) - padding;
-                float3 worldPos = float3(scaledCoord + glyph.pos, 0.0); //add padding around the mesh (note! only works for quad meshes)
+                float3 objectSpacePos = float3(scaledCoord + glyph.pos, 0.0); //add padding around the mesh (note! only works for quad meshes)
                 o.uv = scaledCoord / glyph.size; //object space position is identical to uv coordinate
-                o.vertex = mul(UNITY_MATRIX_VP, float4(worldPos, 1.0));
+
+                o.vertex = mul(UNITY_MATRIX_VP, mul(_ObjectToWorld, float4(objectSpacePos * _Scale, 1.0)));
+
                 return o;
             }
 
@@ -157,8 +166,8 @@ Shader "Unlit/FontShader"
                     sum += evaluateGlyph(i.uv + float2(0.0, offset), pixelsPerUV.x, startLoca, bezierCount);
                     offset += offsetDelta;
                 }
-
-                return float4(1, 1, 1, sum / VERTICAL_SAMPLES);
+                //return float4(i.uv, 0.0, 1.0);
+                return float4(_Color.rgb, _Color.a * sum / VERTICAL_SAMPLES);
             }
             ENDCG
         }

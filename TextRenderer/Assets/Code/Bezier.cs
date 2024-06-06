@@ -1,5 +1,6 @@
 using UnityEngine;
 
+[System.Serializable]
 public struct Bezier
 {
     public Vector2 start;

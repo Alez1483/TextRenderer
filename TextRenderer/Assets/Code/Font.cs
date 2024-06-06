@@ -22,12 +22,10 @@ public class Font : ScriptableObject
             {
                 GlyphDataBuffer?.Release();
                 GlyphLocaBuffer?.Release();
-                Debug.Log("Release buffers for font " + name);
             }
             else if (_activeRenderers == 0 && value > 0) // some renderer started using the font
             {
                 InitializeBuffers();
-                Debug.Log("Initialized buffers for font " + name);
             }
             _activeRenderers = value;
         }
@@ -35,7 +33,7 @@ public class Font : ScriptableObject
 
     public UnityEngine.Object FontAsset;
 
-    public GlyphMetrics[] glyphs;
+    public GlyphMetrics[] glyphsMetrics;
     public CharacterMapper CharacterMapper;
 
     public Bezier[] glyphBezierData;
@@ -47,6 +45,8 @@ public class Font : ScriptableObject
     public int Ascent;
     public int Descent;
     public int LineGap;
+
+    public int UnitsPerEm;
 
     private void InitializeBuffers()
     {

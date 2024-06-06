@@ -60,8 +60,8 @@ public static class FontReader
     private static void ReadGlyphTable(BinaryReader reader)
     {
         Table glyphTable = tables["glyf"];
-        font.glyphs = new GlyphMetrics[glyphCount];
-        List<Vector2>[] glyphData = GlyphReader.ReadGlyphs(glyphTable.offset, reader, loca, font.glyphs); //reads directly to the glyphs array
+        font.glyphsMetrics = new GlyphMetrics[glyphCount];
+        List<Vector2>[] glyphData = GlyphReader.ReadGlyphs(glyphTable.offset, reader, loca, font.glyphsMetrics); //reads directly to the glyphs array
 
         //fill in the glyphBezierData and glyphLocaData arrays to be used for buffers
 
@@ -74,13 +74,13 @@ public static class FontReader
         bezierCount /= 3;
 
         font.glyphBezierData = new Bezier[bezierCount];
-        font.glyphLocaData = new uint[font.glyphs.Length + 1]; //extra location at the end to calculate the count of beziers in glyph
+        font.glyphLocaData = new uint[font.glyphsMetrics.Length + 1]; //extra location at the end to calculate the count of beziers in glyph
 
         //first location not set because it's 0 by default anyway
         uint bezierIdx = 0;
-        for (int glyphIndex = 0; glyphIndex < font.glyphs.Length; glyphIndex++)
+        for (int glyphIndex = 0; glyphIndex < font.glyphsMetrics.Length; glyphIndex++)
         {
-            GlyphMetrics glyphMetrics = font.glyphs[glyphIndex];
+            GlyphMetrics glyphMetrics = font.glyphsMetrics[glyphIndex];
 
             Vector2 min = glyphMetrics.Min;
             Vector2 size = glyphMetrics.Max - min;
@@ -112,7 +112,12 @@ public static class FontReader
     private static void ReadLocaTable(BinaryReader reader)
     {
         //header for shortLocaOffset
-        tables["head"].MoveStreamToTable(reader.BaseStream, 50); //skip first 50 bytes
+        tables["head"].MoveStreamToTable(reader.BaseStream, 18); //skip first 18 bytes
+
+        font.UnitsPerEm = reader.ReadBEUShort();
+
+        reader.BaseStream.SkipBytes(30);
+
         bool shortLocaOffset = reader.ReadBEShort() == 0;
 
         //maximum profiles table for glyph count
@@ -157,16 +162,16 @@ public static class FontReader
         int i;
         for (i = 0; i < numOfLongHorMetrics; i++)
         {
-            font.glyphs[i].AdvanceWidth = reader.ReadBEUShort();
-            font.glyphs[i].LeftSideBearing = reader.ReadBEShort();
+            font.glyphsMetrics[i].AdvanceWidth = reader.ReadBEUShort();
+            font.glyphsMetrics[i].LeftSideBearing = reader.ReadBEShort();
         }
 
-        int lastAdvanceWidth = font.glyphs[i - 1].AdvanceWidth;
+        int lastAdvanceWidth = font.glyphsMetrics[i - 1].AdvanceWidth;
 
         for (; i < glyphCount; i++)
         {
-            font.glyphs[i].AdvanceWidth = lastAdvanceWidth;
-            font.glyphs[i].LeftSideBearing = reader.ReadBEShort();
+            font.glyphsMetrics[i].AdvanceWidth = lastAdvanceWidth;
+            font.glyphsMetrics[i].LeftSideBearing = reader.ReadBEShort();
         }
     }
 

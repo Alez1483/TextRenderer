@@ -20,14 +20,30 @@ public class FontEditor : Editor
         serializedObject.Update();
         EditorGUILayout.PropertyField(fontAssetProperty);
 
-        if (serializedObject.ApplyModifiedProperties())
+        if (serializedObject.hasModifiedProperties)
         {
-            Debug.Log("Font Asset changed");
-            Undo.RecordObject(font, "Font Asset Changed");
-            FontReader.LoadFontAsset(font);
-            Debug.Log("Sure did");
-        }
+            Object asset = fontAssetProperty.objectReferenceValue;
+            string path = AssetDatabase.GetAssetPath(asset);
 
-        EditorGUILayout.LabelField(font.ActiveRenderers.ToString());
+            if (IsTtfFile(path))
+            {
+                serializedObject.ApplyModifiedProperties();
+                Undo.RecordObject(font, "Font Asset Changed");
+                FontReader.LoadFontAsset(font);
+            }
+            else
+            {
+                Debug.LogError("Given Asset is not a TrueType Font File");
+            }
+        }
+    }
+
+    private bool IsTtfFile(string path)
+    {
+        if (path == null)
+        {
+            return false;
+        }
+        return path.EndsWith(".ttf");
     }
 }

@@ -12,13 +12,15 @@ public class TextRendererEditor : Editor
     private SerializedProperty textProperty;
     private SerializedProperty horizontalAlignmenProperty;
 
-    private Font oldFontValue;
+    //private Font oldFontValue;
     private Color oldColorValue;
     private float oldScaleValue;
 
     public override void OnInspectorGUI()
     {
         TextRenderer textRenderer = target as TextRenderer;
+
+        Font oldFontValue = (Font)fontProperty.objectReferenceValue;
 
         serializedObject.Update();
 
@@ -33,15 +35,20 @@ public class TextRendererEditor : Editor
             Font newFontValue = (Font)fontProperty.objectReferenceValue;
             if (newFontValue != oldFontValue)
             {
-                textRenderer.FontChanged();
-
                 if (Application.isPlaying)
                 {
-                    newFontValue.ActiveRenderers++;
-                    oldFontValue.ActiveRenderers--;
+                    if (newFontValue != null)
+                    {
+                        newFontValue.ActiveRenderers++;
+                    }
+                    if (oldFontValue != null)
+                    {
+                        oldFontValue.ActiveRenderers--;
+                    }
                 }
+                textRenderer.FontChanged();
 
-                oldFontValue = (Font)fontProperty.objectReferenceValue;
+                oldFontValue = newFontValue;
             }
             if (colorProperty.colorValue != oldColorValue)
             {

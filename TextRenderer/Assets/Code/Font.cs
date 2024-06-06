@@ -22,10 +22,12 @@ public class Font : ScriptableObject
             {
                 GlyphDataBuffer?.Release();
                 GlyphLocaBuffer?.Release();
+                Debug.Log("released");
             }
             else if (_activeRenderers == 0 && value > 0) // some renderer started using the font
             {
                 InitializeBuffers();
+                Debug.Log("initialized");
             }
             _activeRenderers = value;
         }
